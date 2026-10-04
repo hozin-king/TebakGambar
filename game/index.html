@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tebak Gambar</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="coin-pill">🪙 <span id="coinCount">100</span></div>
+    <button class="icon-btn" id="musicBtn" title="Musik">🔊</button>
+  </header>
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <div class="logo">🖼️❓</div>
+    <h1>TEBAK<br>GAMBAR</h1>
+    <p class="tagline">Lihat gambarnya, tebak katanya!</p>
+    <p class="progress-info" id="homeProgress"></p>
+    <p class="stats-info" id="homeStats"></p>
+    <button class="btn big" id="btnPlay">▶ MAIN</button>
+    <button class="btn daily" id="btnDaily">📅 TANTANGAN HARIAN</button>
+    <button class="btn secondary" id="btnLevels">🗂 PILIH LEVEL</button>
+    <div class="ach-section">
+      <p class="ach-title">🏅 PENCAPAIAN</p>
+      <div id="achRow" class="ach-row"></div>
+    </div>
+    <button class="btn ghost" id="btnReset">↺ Ulangi dari awal</button>
+  </section>
+
+  <!-- LEVEL SELECT -->
+  <section id="screen-levels" class="screen">
+    <h2>PILIH LEVEL</h2>
+    <div id="levelTabs" class="level-tabs"></div>
+    <p class="progress-info" id="levelProgress"></p>
+    <div id="stageGrid" class="grid"></div>
+    <button class="btn secondary" id="btnBackHome">← KEMBALI</button>
+  </section>
+
+  <!-- PLAY -->
+  <section id="screen-play" class="screen">
+    <div class="play-head">
+      <button class="icon-btn" id="btnBackLevels">←</button>
+      <h2 id="levelTitle">LEVEL 1</h2>
+      <span id="comboBadge" class="combo-badge hidden"></span>
+    </div>
+    <div class="img-card"><img id="levelImg" alt="Petunjuk gambar" draggable="false"></div>
+    <div id="slots" class="slots"></div>
+    <div id="bank" class="bank"></div>
+    <div class="hint-bar">
+      <button class="hint" id="hintReveal">💡<span>Buka Huruf</span><small>50 🪙</small></button>
+      <button class="hint" id="hintRemove">🧹<span>Hapus Huruf</span><small>30 🪙</small></button>
+      <button class="hint" id="hintSkip">⏭<span>Lewati</span><small>100 🪙</small></button>
+    </div>
+    <button class="btn big" id="btnCheck">CEK JAWABAN</button>
+  </section>
+
+  <!-- WIN OVERLAY -->
+  <div id="overlay" class="overlay hidden">
+    <div class="card">
+      <div class="big-emoji" id="winEmoji">🎉</div>
+      <h2 id="winTitle">BENAR!</h2>
+      <p id="winText">+40 koin</p>
+      <button class="btn big" id="btnNext">LANJUT ▶</button>
+      <button class="btn secondary" id="btnWinLevels">PILIH LEVEL</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

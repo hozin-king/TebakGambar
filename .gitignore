@@ -1,0 +1,11 @@
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+# game copy hasil CI (dibuat otomatis saat build)
+android/app/src/main/assets/
+
+# OS / editor
+.DS_Store
+.idea/
+*.iml

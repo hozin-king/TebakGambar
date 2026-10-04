@@ -25,6 +25,8 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets
           cp -r game android/app/src/main/assets/game
+          # PNG asli tidak ikut ke APK — hanya .bin terenkripsi yang dipakai
+          find android/app/src/main/assets/game/assets -name "*.png" -delete
 
       - name: Build debug APK
         working-directory: android

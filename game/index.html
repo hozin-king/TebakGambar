@@ -10,7 +10,10 @@
 <div id="app">
   <header id="topbar">
     <div class="coin-pill">🪙 <span id="coinCount">100</span></div>
-    <button class="icon-btn" id="musicBtn" title="Musik">🔊</button>
+    <div class="top-actions">
+      <button class="icon-btn" id="settingsBtn" title="Pengaturan">⚙️</button>
+      <button class="icon-btn" id="musicBtn" title="Musik">🔊</button>
+    </div>
   </header>
 
   <!-- HOME -->
@@ -27,7 +30,25 @@
       <p class="ach-title">🏅 PENCAPAIAN</p>
       <div id="achRow" class="ach-row"></div>
     </div>
-    <button class="btn ghost" id="btnReset">↺ Ulangi dari awal</button>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="screen-settings" class="screen">
+    <h2>⚙️ PENGATURAN</h2>
+    <div class="set-row">
+      <span>🔔 Efek suara (SFX)</span>
+      <label class="switch"><input type="checkbox" id="setSfx" checked><span class="slider-sw"></span></label>
+    </div>
+    <div class="set-row">
+      <span>🎵 Musik latar</span>
+      <label class="switch"><input type="checkbox" id="setMusic" checked><span class="slider-sw"></span></label>
+    </div>
+    <div class="set-row col">
+      <span>🔊 Volume: <b id="setVolumeVal">80</b></span>
+      <input type="range" id="setVolume" min="0" max="100" value="80">
+    </div>
+    <button class="btn secondary" id="btnResetSettings">↺ Reset progress</button>
+    <button class="btn secondary" id="btnBackSettings">← KEMBALI</button>
   </section>
 
   <!-- LEVEL SELECT -->

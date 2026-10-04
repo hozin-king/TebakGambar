@@ -54,8 +54,15 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
+        // Delegasikan ke navigation stack di JS (window.__goBack):
+        // true  = JS menangani (pindah layar / tutup popup) -> jangan exit
+        // false = sudah di home -> boleh exit
+        if (::webView.isInitialized) {
+            webView.evaluateJavascript("window.__goBack()") { result ->
+                if (result != "true") {
+                    super.onBackPressed()
+                }
+            }
         } else {
             super.onBackPressed()
         }

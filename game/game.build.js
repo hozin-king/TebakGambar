@@ -127,6 +127,7 @@ function defaultSave() {
     combo: 0, bestCombo: 0, totalEarned: 0,
     achievements: {},
     daily: { lastDate: "", streak: 0, doneDate: "" },
+    settings: { sfx: true, music: true, volume: 80 },
   };
 }
 function migrateOldSave(s) {
@@ -211,12 +212,15 @@ const Sfx = {
     return this.ctx;
   },
   tone(freq, dur, type, vol, delay) {
+    if (!save.settings.sfx) return;
+    const v = (vol || 0.12) * ((save.settings.volume || 0) / 100);
+    if (v <= 0.0005) return;
     const ctx = this.ensure(); if (!ctx || !freq) return;
     const t = ctx.currentTime + (delay || 0);
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type || "sine"; o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(ctx.destination);
     o.start(t); o.stop(t + dur + 0.05);
@@ -254,10 +258,91 @@ const Music = {
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } },
   toggle() {
     this.on = !this.on;
+    save.settings.music = this.on; persist();
     if (this.on) this.start(); else this.stop();
     return this.on;
   }
 };
+
+/* ---------------- gambar level terenkripsi (.bin) ----------------
+   .bin = PNG yang di-XOR (lihat encrypt_assets.py). Key sama dengan
+   key jawaban (_KEY dari blok enkripsi build.py; fallback untuk test source). */
+function assetKey() {
+  if (typeof _KEY !== "undefined") return _KEY;
+  return atob("VGdFbmM=") + String.fromCharCode(95, 50, 48, 50, 54, 95) + "!7qX".split("").reverse().join("");
+}
+const imgURLCache = {};
+function decryptBytes(u8) {
+  const k = assetKey();
+  const out = new Uint8Array(u8.length);
+  for (let i = 0; i < u8.length; i++) out[i] = u8[i] ^ k.charCodeAt(i % k.length);
+  return out;
+}
+function isPng(u8) {
+  return u8.length > 4 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
+}
+function setImgSrc(url) { const im = $("levelImg"); if (im) im.src = url; }
+async function loadLevelImage(pngPath) {
+  const binPath = pngPath.replace(/\.png$/i, ".bin");
+  if (imgURLCache[binPath]) { setImgSrc(imgURLCache[binPath]); return; }
+  try {
+    const resp = await fetch(binPath);
+    if (!resp.ok) throw new Error("fetch " + resp.status);
+    const dec = decryptBytes(new Uint8Array(await resp.arrayBuffer()));
+    if (!isPng(dec)) throw new Error("bad magic");
+    const url = URL.createObjectURL(new Blob([dec], { type: "image/png" }));
+    imgURLCache[binPath] = url;
+    setImgSrc(url);
+  } catch (e) {
+    setImgSrc(pngPath); // fallback: PNG langsung (dev tanpa .bin)
+  }
+}
+function preloadImage(pngPath) {
+  const binPath = pngPath.replace(/\.png$/i, ".bin");
+  if (!binPath || imgURLCache[binPath]) return;
+  fetch(binPath).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+    .then((ab) => {
+      const dec = decryptBytes(new Uint8Array(ab));
+      if (isPng(dec)) imgURLCache[binPath] = URL.createObjectURL(new Blob([dec], { type: "image/png" }));
+    }).catch(() => {});
+}
+
+/* ---------------- navigation stack ----------------
+   home -> levels -> play, home -> play, home -> settings.
+   Tombol back (UI maupun native Android) = pop stack.
+   window.__goBack dipanggil native via evaluateJavascript;
+   return true = di-handle JS, false = sudah di home (native boleh exit). */
+const navStack = ["screen-home"];
+function goScreen(id) {
+  show(id);
+  if (navStack[navStack.length - 1] !== id) navStack.push(id);
+}
+function goHome() {
+  navStack.length = 0; navStack.push("screen-home");
+  refreshHome(); show("screen-home");
+}
+function goLevels() {
+  navStack.length = 0; navStack.push("screen-home", "screen-levels");
+  renderLevelTabs(); renderStages(); show("screen-levels");
+}
+function goBack() {
+  if (!$("overlay").classList.contains("hidden")) {
+    $("overlay").classList.add("hidden");
+    Sfx.back();
+    return true;
+  }
+  if (navStack.length > 1) {
+    navStack.pop();
+    const top = navStack[navStack.length - 1];
+    if (top === "screen-home") refreshHome();
+    if (top === "screen-levels") { renderLevelTabs(); renderStages(); }
+    Sfx.back();
+    show(top);
+    return true;
+  }
+  return false;
+}
+window.__goBack = function () { return goBack(); };
 
 /* ---------------- state level ---------------- */
 let levelIndex = 0;
@@ -377,7 +462,7 @@ function renderStages() {
     else {
       b.textContent = (k + 1);
       if (save.done[i]) { b.classList.add("done"); b.innerHTML = (k + 1) + '<span class="check">✓</span>'; }
-      b.addEventListener("click", () => { Sfx.click(); startLevel(i); });
+      b.addEventListener("click", () => { Sfx.click(); startLevel(i); goScreen("screen-play"); });
     }
     grid.appendChild(b);
   }
@@ -410,10 +495,10 @@ function startLevel(i, opts) {
   $("levelTitle").textContent = dailyMode
     ? "📅 TANTANGAN HARIAN"
     : lm.name + " · TAHAP " + (stageOf(i) + 1);
-  $("levelImg").src = lv.img;
+  loadLevelImage(lv.img);
+  if (i + 1 < LEVELS.length) preloadImage(LEVELS[i + 1].img);
   $("overlay").classList.add("hidden");
   renderSlots(); renderBank(); updateCoins(); updateCombo();
-  show("screen-play");
 }
 
 function renderSlots() {
@@ -549,8 +634,8 @@ function hintSkip() {
   }
   persist();
   toast("Tahap dilewati!");
-  if (levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1, { daily: dailyMode });
-  else { renderLevelTabs(); renderStages(); show("screen-levels"); }
+  if (levelIndex < LEVELS.length - 1) { startLevel(levelIndex + 1, { daily: dailyMode }); show("screen-play"); }
+  else goLevels();
   refreshHome();
 }
 
@@ -562,31 +647,32 @@ $("btnPlay").addEventListener("click", () => {
   while (i < LEVELS.length && (levelOf(i) >= save.unlockedLevels || save.done[i])) i++;
   if (i >= LEVELS.length) i = LEVELS.length - 1;
   curLevel = levelOf(i);
-  startLevel(i);
+  startLevel(i); goScreen("screen-play");
 });
 $("btnDaily").addEventListener("click", () => {
   if (save.daily.doneDate === todayStr()) { toast("Tantangan hari ini sudah selesai. Besok lagi ya!"); return; }
   Sfx.ensure(); Music.start();
   Sfx.click();
-  startLevel(dailySeed(), { daily: true });
+  startLevel(dailySeed(), { daily: true }); goScreen("screen-play");
 });
-$("btnLevels").addEventListener("click", () => { Sfx.click(); renderLevelTabs(); renderStages(); show("screen-levels"); });
-$("btnBackHome").addEventListener("click", () => { Sfx.back(); refreshHome(); show("screen-home"); });
-$("btnBackLevels").addEventListener("click", () => { Sfx.back(); renderStages(); show("screen-levels"); });
+$("btnLevels").addEventListener("click", () => { Sfx.click(); goLevels(); });
+$("btnBackHome").addEventListener("click", () => { goBack(); });
+$("btnBackLevels").addEventListener("click", () => { goBack(); });
 $("btnCheck").addEventListener("click", checkAnswer);
 $("hintReveal").addEventListener("click", hintReveal);
 $("hintRemove").addEventListener("click", hintRemove);
 $("hintSkip").addEventListener("click", hintSkip);
 $("btnNext").addEventListener("click", () => {
   Sfx.click();
-  if (dailyMode) { refreshHome(); show("screen-home"); }
-  else startLevel(levelIndex + 1);
+  if (dailyMode) { goHome(); }
+  else { startLevel(levelIndex + 1); show("screen-play"); }
 });
-$("btnWinLevels").addEventListener("click", () => { Sfx.click(); renderLevelTabs(); renderStages(); show("screen-levels"); refreshHome(); });
-$("btnReset").addEventListener("click", () => {
-  if (confirm("Hapus semua progress dan mulai dari awal?")) {
-    save = defaultSave(); persist(); refreshHome(); Sfx.back(); toast("Progress direset!");
-  }
+/* BUGFIX: tombol PILIH LEVEL di popup harus menutup popup + ke layar level */
+$("btnWinLevels").addEventListener("click", () => {
+  Sfx.click();
+  $("overlay").classList.add("hidden");
+  refreshHome();
+  goLevels();
 });
 $("musicBtn").addEventListener("click", () => {
   Sfx.ensure();
@@ -595,9 +681,44 @@ $("musicBtn").addEventListener("click", () => {
   if (on) Sfx.click();
 });
 
+/* ---------------- pengaturan ---------------- */
+function renderSettings() {
+  $("setSfx").checked = !!save.settings.sfx;
+  $("setMusic").checked = !!save.settings.music;
+  $("setVolume").value = save.settings.volume;
+  $("setVolumeVal").textContent = save.settings.volume;
+}
+$("settingsBtn").addEventListener("click", () => { Sfx.click(); renderSettings(); goScreen("screen-settings"); });
+$("btnBackSettings").addEventListener("click", () => { goBack(); });
+$("setSfx").addEventListener("change", (e) => {
+  save.settings.sfx = e.target.checked; persist();
+  if (e.target.checked) Sfx.click();
+});
+$("setMusic").addEventListener("change", (e) => {
+  save.settings.music = e.target.checked; persist();
+  if (e.target.checked) { Music.on = true; Music.start(); Sfx.click(); }
+  else { Music.on = false; Music.stop(); }
+  $("musicBtn").textContent = e.target.checked ? "🔊" : "🔇";
+});
+$("setVolume").addEventListener("input", (e) => {
+  save.settings.volume = Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
+  persist();
+  $("setVolumeVal").textContent = save.settings.volume;
+});
+$("btnResetSettings").addEventListener("click", () => {
+  if (confirm("Yakin hapus semua progress dan mulai dari awal?")) {
+    const st = save.settings;
+    save = defaultSave(); save.settings = st; persist();
+    refreshHome(); renderSettings(); Sfx.back(); toast("Progress direset!");
+  }
+});
+
 /* cegah double-tap zoom di iOS */
 document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
 
+/* ---------------- boot ---------------- */
+Music.on = save.settings.music !== false;
+$("musicBtn").textContent = Music.on ? "🔊" : "🔇";
 recalcLevelUnlock();
 refreshHome();
 show("screen-home");
